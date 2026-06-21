@@ -1,0 +1,8 @@
+# LuaLS type stubs (fetched by setup script, not committed)
+.luals/
+
+# Editor
+.DS_Store
+*.swp
+*.swo
+.idea/

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "Lua.runtime.version": "Lua 5.1",
+  "Lua.workspace.library": [
+    "./.luals/cc-tweaked"
+  ],
+  "Lua.workspace.ignoreDir": [
+    ".luals"
+  ],
+  "Lua.diagnostics.globals": [
+    "peripheral",
+    "rednet",
+    "term",
+    "parallel",
+    "textutils",
+    "colors",
+    "colours",
+    "keys",
+    "vector",
+    "paintutils",
+    "window",
+    "multishell",
+    "turtle",
+    "pocket",
+    "robot",
+    "commands",
+    "bit32",
+    "utf8"
+  ],
+  "Lua.diagnostics.severity": {
+    "undefined-global": "Warning",
+    "missing-return-value": "Warning"
+  },
+  "Lua.format.enable": true,
+  "Lua.completion.enable": true,
+  "Lua.hint.enable": true
+}
