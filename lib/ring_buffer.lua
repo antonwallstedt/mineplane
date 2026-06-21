@@ -34,6 +34,7 @@ function RingBuffer:push(time, value)
   if self._count < self._capacity then
     self._count = self._count + 1
   end
+  return self
 end
 
 --- Number of live samples currently stored.
@@ -94,18 +95,23 @@ end
 --- Returns all live samples in oldest-first order.
 --- @return {time:number, value:number}[]
 function RingBuffer:all()
-  return self:last(math.huge)
+  return self:last(self._count)
 end
 
 --- Returns an iterator over all live samples, oldest first.
 --- for sample in buf:iter() do ... end
 --- @return function
 function RingBuffer:iter()
-  local samples = self:all()
-  local i = 0
+  local remaining = self._count
+  local index = ((self._head + self._capacity - self._count - 1) % self._capacity) + 1
   return function()
-    i = i + 1
-    return samples[i]
+    if remaining == 0 then
+      return nil
+    end
+    local sample = self._buffer[index]
+    index = (index % self._capacity) + 1
+    remaining = remaining - 1
+    return sample
   end
 end
 

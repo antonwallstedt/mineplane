@@ -26,6 +26,14 @@ describe("RingBuffer basic push", function()
     assert.equals(ring_buffer:count(), 2)
   end)
 
+  it("push returns self for chaining", function()
+    local ring_buffer = RingBuffer.new(4)
+    ring_buffer:push(1, 10):push(2, 20):push(3, 30)
+    assert.equals(ring_buffer:count(), 3)
+    assert.same(ring_buffer:latest(), { time = 3, value = 30 })
+    assert.same(ring_buffer:oldest(), { time = 1, value = 10 })
+  end)
+
   it("latest and oldest on empty buffer return nil", function()
     local ring_buffer = RingBuffer.new(4)
     assert.is_nil(ring_buffer:latest())
@@ -110,7 +118,7 @@ describe("RingBuffer wrap-around", function()
     assert.same(ring_buffer:oldest(), { time = 9, value = 90 })
     assert.same(ring_buffer:latest(), { time = 12, value = 120 })
     assert.same(ring_buffer:all(), {
-      { time = 9,  value = 90 },
+      { time = 9, value = 90 },
       { time = 10, value = 100 },
       { time = 11, value = 110 },
       { time = 12, value = 120 },
@@ -121,9 +129,7 @@ end)
 describe("RingBuffer:last", function()
   it("returns samples in oldest-first order", function()
     local ring_buffer = RingBuffer.new(4)
-    ring_buffer:push(1, 10)
-    ring_buffer:push(2, 20)
-    ring_buffer:push(3, 30)
+    ring_buffer:push(1, 10):push(2, 20):push(3, 30)
     assert.same(ring_buffer:last(3), {
       { time = 1, value = 10 },
       { time = 2, value = 20 },
