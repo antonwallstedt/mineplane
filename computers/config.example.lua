@@ -26,4 +26,13 @@ return {
 
   -- Master-only: how long before a NotReady node is evicted (seconds).
   eviction_seconds = 300,
+
+  -- Where to store metric data on this computer's filesystem.
+  metrics_path = "/mineplane/metrics",
+
+  -- How often to scrape collectors, in seconds.
+  scrape_interval = 15,
+
+  -- How often to flush the in-memory ring buffer to disk, in seconds.
+  flush_interval = 60,
 }

@@ -39,8 +39,10 @@ end
 -- ── master ────────────────────────────────────────────────────────────────────
 
 local function run_master(config)
-  local Registry       = require("lib.registry")
-  local RegistryServer = require("core.registry_server")
+  local Registry         = require("lib.registry")
+  local RegistryServer   = require("core.registry_server")
+  local ScrapeController = require("core.scrape_controller")
+  local FlushController  = require("core.flush_controller")
 
   local transport = make_transport()
   local ctx       = make_ctx()
@@ -52,23 +54,41 @@ local function run_master(config)
     master_id = os.getComputerID(),
   })
 
+  local metrics_path = config.metrics_path or "/mineplane/metrics"
+  local scraper = ScrapeController.new(ctx, config.scrape_interval or 15, {
+    fs        = fs,
+    base_path = metrics_path,
+  })
+  scraper:register({
+    name    = "node_count",
+    collect = function(_, _) return #registry:nodes() end,
+  })
+  scraper:register({
+    name    = "ready_count",
+    collect = function(_, _) return #registry:ready_nodes() end,
+  })
+
+  local flusher = FlushController.new(ctx, config.flush_interval or 60)
+  for _, tsdb in ipairs(scraper:tsdbs()) do
+    flusher:register(tsdb)
+  end
+
   print("[mineplane] master started, id=" .. os.getComputerID())
 
-  -- TODO: add subsystems here as the stack grows.
-  -- Each long-running loop gets its own entry in waitForAll.
-  -- Example once ScrapeController exists:
-  --   local scraper = ScrapeController.new(ctx, { ... })
-  --   scraper:register("energy", { collect = ..., ... })
-  --
+  -- Add new long-running subsystems here as the stack grows.
   parallel.waitForAll(
-    function() server:run() end
+    function() server:run()  end,
+    function() scraper:run() end,
+    function() flusher:run() end
   )
 end
 
 -- ── worker ────────────────────────────────────────────────────────────────────
 
 local function run_worker(config)
-  local NodeAgent = require("core.node_agent")
+  local NodeAgent        = require("core.node_agent")
+  local ScrapeController = require("core.scrape_controller")
+  local FlushController  = require("core.flush_controller")
 
   local transport = make_transport()
   local ctx       = make_ctx()
@@ -79,11 +99,33 @@ local function run_worker(config)
     interval_seconds = config.heartbeat_interval,
   })
 
+  local metrics_path = config.metrics_path or "/mineplane/metrics"
+  local scraper = ScrapeController.new(ctx, config.scrape_interval or 15, {
+    fs        = fs,
+    base_path = metrics_path,
+  })
+
+  -- collectors.lua on this computer registers local peripheral metrics.
+  -- Return a list of collector specs: { { name, collect, ... }, ... }
+  if fs.exists("collectors.lua") then
+    local collectors = dofile("collectors.lua")
+    for _, spec in ipairs(collectors) do
+      scraper:register(spec)
+    end
+  end
+
+  local flusher = FlushController.new(ctx, config.flush_interval or 60)
+  for _, tsdb in ipairs(scraper:tsdbs()) do
+    flusher:register(tsdb)
+  end
+
   print("[mineplane] worker started, label=" .. label)
 
-  -- TODO: add worker subsystems here (local collectors, display loops, etc.).
+  -- Add new long-running subsystems here as the stack grows.
   parallel.waitForAll(
-    function() agent:run() end
+    function() agent:run()   end,
+    function() scraper:run() end,
+    function() flusher:run() end
   )
 end
 
