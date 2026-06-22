@@ -179,7 +179,7 @@ end
 local function discover_tests()
   local files = {}
   -- popen is available in standard Lua but not CC; fine for CI/dev
-  local handle = io.popen("find test -name '*.lua' -not -name 'runner.lua' 2>/dev/null")
+  local handle = io.popen("find test -name '*_test.lua' 2>/dev/null")
   if handle then
     for line in handle:lines() do
       table.insert(files, line)

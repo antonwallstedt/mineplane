@@ -55,26 +55,24 @@ function RingBuffer:is_empty()
   return self._count == 0
 end
 
+--- Physical buffer index for a logical offset from the oldest live sample.
+--- offset 0 = oldest, offset _count-1 = newest.
+function RingBuffer:_index_at(offset)
+  return ((self._head - 1 + self._capacity - self._count + offset) % self._capacity) + 1
+end
+
 --- Most recent sample, or nil if empty.
 --- @return {time:number, value:number}|nil
 function RingBuffer:latest()
-  if self._count == 0 then
-    return nil
-  end
-  -- newest is one step behind _head
-  local index = ((self._head - 2) % self._capacity) + 1
-  return self._buffer[index]
+  if self._count == 0 then return nil end
+  return self._buffer[self:_index_at(self._count - 1)]
 end
 
 --- Oldest live sample, or nil if empty.
 --- @return {time:number, value:number}|nil
 function RingBuffer:oldest()
-  if self._count == 0 then
-    return nil
-  end
-  -- oldest is _count steps behind _head
-  local index = ((self._head - 1 + self._capacity - self._count) % self._capacity) + 1
-  return self._buffer[index]
+  if self._count == 0 then return nil end
+  return self._buffer[self:_index_at(0)]
 end
 
 --- Returns up to n most recent samples in oldest-first order.
@@ -85,9 +83,7 @@ function RingBuffer:last(n)
   n = math.min(n, self._count)
   local result = {}
   for i = 1, n do
-    -- i=1 is oldest of the window; window starts _count-n steps from oldest overall
-    local index = ((self._head + self._capacity - n + i - 2) % self._capacity) + 1
-    table.insert(result, self._buffer[index])
+    result[i] = self._buffer[self:_index_at(self._count - n + i - 1)]
   end
   return result
 end
@@ -103,11 +99,9 @@ end
 --- @return function
 function RingBuffer:iter()
   local remaining = self._count
-  local index = ((self._head + self._capacity - self._count - 1) % self._capacity) + 1
+  local index = self:_index_at(0)
   return function()
-    if remaining == 0 then
-      return nil
-    end
+    if remaining == 0 then return nil end
     local sample = self._buffer[index]
     index = (index % self._capacity) + 1
     remaining = remaining - 1

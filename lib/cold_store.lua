@@ -73,21 +73,12 @@ function ColdStore:_read_tier(tier)
   return samples
 end
 
-function ColdStore:_append_tier(tier, samples)
-  if #samples == 0 then
-    return
-  end
-  local file = self._fs.open(self:_tier_path(tier), "a")
-  for _, s in ipairs(samples) do
-    file:writeLine(s.time .. "," .. s.value)
-  end
-  file:close()
-end
-
--- Passing empty samples intentionally truncates the file — used by
--- compact_and_evict to reset a tier after all entries have been promoted.
-function ColdStore:_write_tier(tier, samples)
-  local file = self._fs.open(self:_tier_path(tier), "w")
+-- mode "a": append; skips open entirely when samples is empty (no-op).
+-- mode "w": overwrite; empty samples intentionally truncates the file,
+--           used by compact_and_evict to reset a tier after full promotion.
+function ColdStore:_write_lines(tier, samples, mode)
+  if mode == "a" and #samples == 0 then return end
+  local file = self._fs.open(self:_tier_path(tier), mode)
   for _, s in ipairs(samples) do
     file:writeLine(s.time .. "," .. s.value)
   end
@@ -95,6 +86,16 @@ function ColdStore:_write_tier(tier, samples)
 end
 
 -- ─── bucketing ────────────────────────────────────────────────────────────────
+
+local function filter_range(samples, from, to)
+  local result = {}
+  for _, s in ipairs(samples) do
+    if s.time >= from and s.time <= to then
+      table.insert(result, s)
+    end
+  end
+  return result
+end
 
 -- Pure function — no dependency on self or any tier state.
 -- Groups samples into fixed-width time windows and reduces each window to one
@@ -129,10 +130,7 @@ end
 --- Flush raw samples (from ring buffer) into tier1.
 --- @param samples  {time:number, value:number}[]
 function ColdStore:flush(samples)
-  if #samples == 0 then
-    return
-  end
-  self:_append_tier("tier1", bucket(samples, self._window_seconds, self._downsample))
+  self:_write_lines("tier1", bucket(samples, self._window_seconds, self._downsample), "a")
 end
 
 --- Move tier1 entries older than retain_seconds into tier2, then trim tier2.
@@ -149,20 +147,15 @@ function ColdStore:compact_and_evict(now_seconds)
     end
   end
   if #old > 0 then
-    self:_append_tier("tier2", bucket(old, self._tier2_window_seconds, self._downsample))
-    self:_write_tier("tier1", recent)
+    self:_write_lines("tier2", bucket(old, self._tier2_window_seconds, self._downsample), "a")
+    self:_write_lines("tier1", recent, "w")
   end
 
   local tier2_cutoff = now_seconds - self._tier2_retain_seconds
   local tier2 = self:_read_tier("tier2")
-  local live_tier2 = {}
-  for _, s in ipairs(tier2) do
-    if s.time >= tier2_cutoff then
-      table.insert(live_tier2, s)
-    end
-  end
+  local live_tier2 = filter_range(tier2, tier2_cutoff, math.huge)
   if #live_tier2 ~= #tier2 then
-    self:_write_tier("tier2", live_tier2)
+    self:_write_lines("tier2", live_tier2, "w")
   end
 end
 
@@ -172,13 +165,8 @@ end
 --- @return {time:number, value:number}[]
 function ColdStore:query(from, to)
   local result = {}
-  for _, s in ipairs(self:_read_tier("tier2")) do
-    if s.time >= from and s.time <= to then
-      table.insert(result, s)
-    end
-  end
-  for _, s in ipairs(self:_read_tier("tier1")) do
-    if s.time >= from and s.time <= to then
+  for _, tier in ipairs({ "tier2", "tier1" }) do
+    for _, s in ipairs(filter_range(self:_read_tier(tier), from, to)) do
       table.insert(result, s)
     end
   end

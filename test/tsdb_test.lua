@@ -1,38 +1,7 @@
 local Tsdb = require("lib.tsdb")
-
--- ─── fs mock (same pattern as cold_store_test) ────────────────────────────────
-
-local function make_fs()
-  local store = {}
-  return {
-    exists = function(path) return store[path] ~= nil end,
-    open = function(path, mode)
-      if mode == "w" then
-        store[path] = ""
-      elseif mode == "a" then
-        store[path] = store[path] or ""
-      end
-      local buf = store[path] or ""
-      local lines = {}
-      for line in (buf .. "\n"):gmatch("([^\n]*)\n") do
-        if line ~= "" then table.insert(lines, line) end
-      end
-      local read_pos = 1
-      return {
-        readLine  = function() local l = lines[read_pos]; read_pos = read_pos + 1; return l end,
-        writeLine = function(_, line) store[path] = store[path] .. line .. "\n" end,
-        close     = function() end,
-      }
-    end,
-  }
-end
-
-local function average(...)
-  local values = { ... }
-  local sum = 0
-  for _, v in ipairs(values) do sum = sum + v end
-  return sum / #values
-end
+local fakes = require("test.support.fakes")
+local make_fs = fakes.make_fs
+local average = fakes.average
 
 local function make_tsdb(overrides)
   local config = overrides or {}

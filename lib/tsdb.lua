@@ -114,8 +114,8 @@ end
 --- @return Tsdb
 function Builder:build(fs, path)
   assert(type(self._capacity) == "number" and self._capacity >= 1, "capacity must be a positive integer")
-  assert(type(self._window_seconds) == "number" and self._window_seconds > 0, "window_seconds is required")
-  assert(type(self._retain_seconds) == "number" and self._retain_seconds > 0, "retain_seconds is required")
+  assert(type(self._window_seconds) == "number" and self._window_seconds > 0, "window_seconds must be a positive number")
+  assert(type(self._retain_seconds) == "number" and self._retain_seconds > 0, "retain_seconds must be a positive number")
   assert(type(self._downsample) == "function", "downsample must be a function")
   local ring_buffer = RingBuffer.new(self._capacity)
   local cold_store = ColdStore.new(fs, path, {
