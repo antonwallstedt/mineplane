@@ -61,15 +61,15 @@ function ColdStore:_read_tier(tier)
   end
   local file = self._fs.open(path, "r")
   local samples = {}
-  local line = file:readLine()
+  local line = file.readLine()
   while line do
     local sample = parse_csv_line(line)
     if sample then
       table.insert(samples, sample)
     end
-    line = file:readLine()
+    line = file.readLine()
   end
-  file:close()
+  file.close()
   return samples
 end
 
@@ -80,9 +80,9 @@ function ColdStore:_write_lines(tier, samples, mode)
   if mode == "a" and #samples == 0 then return end
   local file = self._fs.open(self:_tier_path(tier), mode)
   for _, s in ipairs(samples) do
-    file:writeLine(s.time .. "," .. s.value)
+    file.writeLine(s.time .. "," .. s.value)
   end
-  file:close()
+  file.close()
 end
 
 -- ─── bucketing ────────────────────────────────────────────────────────────────

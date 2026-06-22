@@ -26,7 +26,7 @@ function M.make_fs()
           read_pos = read_pos + 1
           return line
         end,
-        writeLine = function(_, line)
+        writeLine = function(line)
           store[path] = store[path] .. line .. "\n"
         end,
         close = function() end,
