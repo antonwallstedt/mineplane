@@ -33,11 +33,12 @@ function Registry:register(node_info, now)
   assert(type(now) == "number", "now must be a number")
   local existing = self._nodes[node_info.id] or {}
   self._nodes[node_info.id] = {
-    id        = node_info.id,
-    label     = node_info.label  or existing.label  or "",
-    labels    = node_info.labels or existing.labels or {},
-    last_seen = now,
-    status    = "Ready",
+    id            = node_info.id,
+    label         = node_info.label  or existing.label  or "",
+    labels        = node_info.labels or existing.labels or {},
+    last_seen     = now,
+    registered_at = existing.registered_at or now,
+    status        = "Ready",
   }
 end
 

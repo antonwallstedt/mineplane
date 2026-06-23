@@ -21,7 +21,8 @@ local NodeDisplay = {}
 NodeDisplay.__index = NodeDisplay
 
 -- Fixed column widths; label expands to fill remaining monitor width.
-local COLS_FIXED = { id = 4, status = 10, age = 8 }  -- sum = 22
+-- "last" = time since last heartbeat. "age" = time since first registration.
+local COLS_FIXED = { id = 4, status = 10, last = 8, age = 8 }  -- sum = 30
 
 local DEFAULT_REFRESH  = 5
 local DEFAULT_SCALE    = 0.5
@@ -53,7 +54,7 @@ local function render(mon, registry, now, scale)
   local w, _ = mon.getSize()
 
   -- Label column fills remaining width after fixed columns.
-  local label_w = math.max(8, w - COLS_FIXED.id - COLS_FIXED.status - COLS_FIXED.age)
+  local label_w = math.max(8, w - COLS_FIXED.id - COLS_FIXED.status - COLS_FIXED.last - COLS_FIXED.age)
 
   local all    = registry:nodes()
   local ready  = registry:ready_nodes()
@@ -69,16 +70,19 @@ local function render(mon, registry, now, scale)
   local col_header = display.pad("ID",     COLS_FIXED.id)
                   .. display.pad("Label",  label_w)
                   .. display.pad("Status", COLS_FIXED.status)
+                  .. display.pad("Last",   COLS_FIXED.last)
                   .. display.pad("Age",    COLS_FIXED.age)
   display.write_at(mon, 1, 3, col_header, colors.yellow)
 
   -- rows 4+: one per node
   for i, node in ipairs(all) do
-    local age   = display.format_age(math.max(0, now - node.last_seen))
+    local last  = display.format_age(math.max(0, now - node.last_seen))
+    local age   = display.format_age(math.max(0, now - (node.registered_at or node.last_seen)))
     local color = node.status == "Ready" and colors.green or colors.red
     local line  = display.pad(tostring(node.id), COLS_FIXED.id)
                 .. display.pad(node.label,        label_w)
                 .. display.pad(node.status,        COLS_FIXED.status)
+                .. display.pad(last,               COLS_FIXED.last)
                 .. display.pad(age,                COLS_FIXED.age)
     display.write_at(mon, 1, 3 + i, line, color)
   end

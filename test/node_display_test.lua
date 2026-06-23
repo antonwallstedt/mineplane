@@ -90,13 +90,26 @@ describe("NodeDisplay", function()
     assert.equals(node_rows, 2)
   end)
 
-  it("age column reflects time since last_seen", function()
+  it("last column reflects time since last_seen", function()
     local nd, mon, registry = make_display(5000000)
     registry:register({ id = 1, label = "farm" }, 4940)
     nd:step()
     local found = false
     for _, text in ipairs(mon._written()) do
       if text:find("60s") or text:find("1m") then found = true; break end
+    end
+    assert.truthy(found)
+  end)
+
+  it("age column reflects time since registered_at not last_seen", function()
+    local nd, mon, registry = make_display(5000000)
+    registry:register({ id = 1, label = "farm" }, 1000)   -- registered_at=1000
+    registry:heartbeat(1, 4990)                            -- last_seen updated
+    nd:step()
+    -- age should be ~4000s (1h06m), not ~10s
+    local found = false
+    for _, text in ipairs(mon._written()) do
+      if text:find("1h") then found = true; break end
     end
     assert.truthy(found)
   end)
