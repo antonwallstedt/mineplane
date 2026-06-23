@@ -20,7 +20,8 @@ local colors = _G.colors or {
 local NodeDisplay = {}
 NodeDisplay.__index = NodeDisplay
 
-local COLS = { id = 4, label = 16, status = 10, age = 8 }
+-- Fixed column widths; label expands to fill remaining monitor width.
+local COLS_FIXED = { id = 4, status = 10, age = 8 }  -- sum = 22
 
 local DEFAULT_REFRESH  = 5
 local DEFAULT_SCALE    = 0.5
@@ -46,14 +47,13 @@ end
 
 -- ── rendering ─────────────────────────────────────────────────────────────────
 
-local function row_width()
-  return COLS.id + COLS.label + COLS.status + COLS.age
-end
-
 local function render(mon, registry, now, scale)
   mon.clear()
   mon.setTextScale(scale)
-  local w = row_width()
+  local w, _ = mon.getSize()
+
+  -- Label column fills remaining width after fixed columns.
+  local label_w = math.max(8, w - COLS_FIXED.id - COLS_FIXED.status - COLS_FIXED.age)
 
   local all    = registry:nodes()
   local ready  = registry:ready_nodes()
@@ -66,20 +66,20 @@ local function render(mon, registry, now, scale)
   display.hline(mon, 2, w, colors.gray)
 
   -- row 3: column headers
-  local col_header = display.pad("ID",     COLS.id)
-                  .. display.pad("Label",  COLS.label)
-                  .. display.pad("Status", COLS.status)
-                  .. display.pad("Age",    COLS.age)
+  local col_header = display.pad("ID",     COLS_FIXED.id)
+                  .. display.pad("Label",  label_w)
+                  .. display.pad("Status", COLS_FIXED.status)
+                  .. display.pad("Age",    COLS_FIXED.age)
   display.write_at(mon, 1, 3, col_header, colors.yellow)
 
   -- rows 4+: one per node
   for i, node in ipairs(all) do
     local age   = display.format_age(math.max(0, now - node.last_seen))
     local color = node.status == "Ready" and colors.green or colors.red
-    local line  = display.pad(tostring(node.id), COLS.id)
-                .. display.pad(node.label,        COLS.label)
-                .. display.pad(node.status,        COLS.status)
-                .. display.pad(age,                COLS.age)
+    local line  = display.pad(tostring(node.id), COLS_FIXED.id)
+                .. display.pad(node.label,        label_w)
+                .. display.pad(node.status,        COLS_FIXED.status)
+                .. display.pad(age,                COLS_FIXED.age)
     display.write_at(mon, 1, 3 + i, line, color)
   end
 end
