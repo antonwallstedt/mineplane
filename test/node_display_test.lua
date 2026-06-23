@@ -55,7 +55,7 @@ describe("NodeDisplay", function()
 
   it("Ready node has 'Ready' in written output", function()
     local nd, mon, registry = make_display(5000000)
-    registry:register({ id = 1, label = "farm" }, 5000)
+    registry:register({ id = 1, label = "farm", node = "factory" }, 5000)
     nd:step()
     local found = false
     for _, text in ipairs(mon._written()) do
@@ -66,7 +66,7 @@ describe("NodeDisplay", function()
 
   it("NotReady node has 'NotReady' in written output", function()
     local nd, mon, registry = make_display(5000000, nil)
-    registry:register({ id = 1, label = "farm" }, 4950)
+    registry:register({ id = 1, label = "farm", node = "factory" }, 4950)
     registry:tick(5000)  -- age=50s > timeout=45, still within eviction=300
     nd:step()
     local found = false
@@ -76,23 +76,34 @@ describe("NodeDisplay", function()
     assert.truthy(found)
   end)
 
-  it("renders one row per node", function()
+  it("node name appears in written output", function()
     local nd, mon, registry = make_display(5000000)
-    registry:register({ id = 1, label = "alpha" }, 5000)
-    registry:register({ id = 2, label = "beta"  }, 5000)
+    registry:register({ id = 1, label = "farm", node = "factory" }, 5000)
     nd:step()
-    local node_rows = 0
+    local found = false
+    for _, text in ipairs(mon._written()) do
+      if text:find("factory") then found = true; break end
+    end
+    assert.truthy(found)
+  end)
+
+  it("renders one computer row per registered computer", function()
+    local nd, mon, registry = make_display(5000000)
+    registry:register({ id = 1, label = "alpha", node = "factory" }, 5000)
+    registry:register({ id = 2, label = "beta",  node = "factory" }, 5000)
+    nd:step()
+    local computer_rows = 0
     for _, text in ipairs(mon._written()) do
       if text:find("alpha") or text:find("beta") then
-        node_rows = node_rows + 1
+        computer_rows = computer_rows + 1
       end
     end
-    assert.equals(node_rows, 2)
+    assert.equals(computer_rows, 2)
   end)
 
   it("last column reflects time since last_seen", function()
     local nd, mon, registry = make_display(5000000)
-    registry:register({ id = 1, label = "farm" }, 4940)
+    registry:register({ id = 1, label = "farm", node = "factory" }, 4940)
     nd:step()
     local found = false
     for _, text in ipairs(mon._written()) do
@@ -103,7 +114,7 @@ describe("NodeDisplay", function()
 
   it("age column reflects time since registered_at not last_seen", function()
     local nd, mon, registry = make_display(5000000)
-    registry:register({ id = 1, label = "farm" }, 1000)   -- registered_at=1000
+    registry:register({ id = 1, label = "farm", node = "factory" }, 1000)
     registry:heartbeat(1, 4990)                            -- last_seen updated
     nd:step()
     -- age should be ~4000s (1h06m), not ~10s
