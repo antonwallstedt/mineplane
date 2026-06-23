@@ -109,7 +109,7 @@ end
 
 -- ── 6. listen for incoming ────────────────────────────────────────────────────
 
-section("listen (" .. LISTEN_SECONDS .. "s — run a second computer to send REGISTER)")
+section("listen (" .. LISTEN_SECONDS .. "s - run a second computer to send REGISTER)")
 
 info("waiting " .. LISTEN_SECONDS .. "s for any '" .. PROTOCOL .. "' message ...")
 local sender_id, received = rednet.receive(PROTOCOL, LISTEN_SECONDS)
