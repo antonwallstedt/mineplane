@@ -36,6 +36,23 @@ function M.make_fs()
   }
 end
 
+function M.make_monitor()
+  local cleared = 0
+  local scale_set = nil
+  local written = {}
+  return {
+    clear        = function()    cleared = cleared + 1; written = {} end,
+    setTextScale = function(s)   scale_set = s end,
+    getSize      = function()    return 51, 19 end,
+    setCursorPos = function()    end,
+    setTextColor = function()    end,
+    write        = function(text) table.insert(written, tostring(text)) end,
+    _cleared     = function()    return cleared end,
+    _scale       = function()    return scale_set end,
+    _written     = function()    return written end,
+  }
+end
+
 function M.make_transport()
   local sent, broadcasts, inbox = {}, {}, {}
   return {

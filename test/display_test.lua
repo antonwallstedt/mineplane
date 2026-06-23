@@ -1,0 +1,47 @@
+local display = require("lib.display")
+
+describe("display.pad", function()
+  it("pads a short string to exact width", function()
+    assert.equals(display.pad("hi", 6), "hi    ")
+    assert.equals(#display.pad("hi", 6), 6)
+  end)
+
+  it("returns unchanged string when already exact width", function()
+    assert.equals(display.pad("hello", 5), "hello")
+  end)
+
+  it("truncates long string with '>' marker", function()
+    assert.equals(display.pad("toolongstring", 6), "toolo>")
+    assert.equals(#display.pad("toolongstring", 6), 6)
+  end)
+
+  it("coerces non-string input via tostring", function()
+    assert.equals(display.pad(42, 5), "42   ")
+  end)
+end)
+
+describe("display.format_age", function()
+  it("formats seconds under 60 as Ns", function()
+    assert.equals(display.format_age(0),  "0s")
+    assert.equals(display.format_age(42), "42s")
+    assert.equals(display.format_age(59), "59s")
+  end)
+
+  it("formats seconds under 3600 as NmMs", function()
+    assert.equals(display.format_age(60),   "1m00s")
+    assert.equals(display.format_age(90),   "1m30s")
+    assert.equals(display.format_age(3599), "59m59s")
+  end)
+
+  it("formats seconds under 86400 as NhMm", function()
+    assert.equals(display.format_age(3600),  "1h00m")
+    assert.equals(display.format_age(3661),  "1h01m")
+    assert.equals(display.format_age(86399), "23h59m")
+  end)
+
+  it("formats seconds over a day as NdHh", function()
+    assert.equals(display.format_age(86400),  "1d00h")
+    assert.equals(display.format_age(90000),  "1d01h")
+    assert.equals(display.format_age(172800), "2d00h")
+  end)
+end)

@@ -35,4 +35,7 @@ return {
 
   -- How often to flush the in-memory ring buffer to disk, in seconds.
   flush_interval = 60,
+
+  -- How often to redraw the monitor display, in seconds.
+  refresh_seconds = 5,
 }

@@ -47,6 +47,7 @@ local function run_master(config)
   local RegistryServer   = require("core.registry_server")
   local ScrapeController = require("core.scrape_controller")
   local FlushController  = require("core.flush_controller")
+  local NodeDisplay      = require("core.node_display")
 
   local transport = make_transport()
   local ctx       = make_ctx()
@@ -77,13 +78,22 @@ local function run_master(config)
     flusher:register(tsdb)
   end
 
+  local mon = peripheral.find("monitor")
+  if not mon then
+    print("[mineplane] warning: no monitor found, display disabled")
+  end
+  local node_display = mon and NodeDisplay.new(ctx, mon, registry, {
+    refresh_seconds = config.refresh_seconds or 5,
+  })
+
   print("[mineplane] master started, id=" .. os.getComputerID())
 
   -- Add new long-running subsystems here as the stack grows.
   parallel.waitForAll(
     function() server:run()  end,
     function() scraper:run() end,
-    function() flusher:run() end
+    function() flusher:run() end,
+    function() if node_display then node_display:run() end end
   )
 end
 
