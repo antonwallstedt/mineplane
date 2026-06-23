@@ -9,11 +9,15 @@ local function load_config()
 end
 
 local function open_modem()
-  local modem = peripheral.find("modem", function(_, m) return m.isWireless() end)
+  local modem = peripheral.find("modem")
   if not modem then
-    error("no wireless modem attached — attach one and reboot")
+    error("no modem attached — attach one and reboot")
   end
-  rednet.open(peripheral.getName(modem))
+  local name = peripheral.getName(modem)
+  if not modem.isWireless() then
+    print("[mineplane] warning: modem on " .. name .. " is not wireless")
+  end
+  rednet.open(name)
   return modem
 end
 

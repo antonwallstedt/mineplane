@@ -16,7 +16,7 @@ local function fail(msg) printError("  [FAIL] " .. msg) end
 local function info(msg) print("  [--] " .. msg) end
 local function section(title)
   print("")
-  print("── " .. title .. " " .. string.rep("─", 40 - #title))
+  print("-- " .. title .. " " .. string.rep("-", 40 - #title))
 end
 
 -- ── 1. identity ───────────────────────────────────────────────────────────────
@@ -34,18 +34,18 @@ section("modem discovery")
 
 local modem_name, modem
 for _, side in ipairs(peripheral.getNames()) do
-  local p = peripheral.wrap(side)
-  if peripheral.getType(side) == "modem" and p.isWireless() then
+  if peripheral.getType(side) == "modem" then
     modem_name = side
-    modem = p
+    modem = peripheral.wrap(side)
     break
   end
 end
 
 if modem then
-  pass("wireless modem found on side: " .. modem_name)
+  pass("modem found on side: " .. modem_name)
+  info("isWireless() = " .. tostring(modem.isWireless()))
 else
-  fail("no wireless modem found")
+  fail("no modem found")
   print("")
   print("  Attach one with:  attach left modem")
   print("  Then re-run this script.")
