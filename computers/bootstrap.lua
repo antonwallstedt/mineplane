@@ -44,7 +44,9 @@ if fs.exists("config.lua") then
   local choice = ask_choice("Use it or reconfigure?", { "use", "reconfigure" })
   if choice == "use" then
     print("Using existing config.lua.")
-    dofile(PROJECT .. "/computers/startup.lua")
+    local chunk, err = loadfile(PROJECT .. "/computers/startup.lua", "t", _ENV)
+    if not chunk then error(err) end
+    chunk()
     return
   end
 end
@@ -126,4 +128,6 @@ end
 
 print("Launching as " .. cfg.role .. ' "' .. cfg.label .. '"...')
 print("")
-dofile(PROJECT .. "/computers/startup.lua")
+local chunk, err = loadfile(PROJECT .. "/computers/startup.lua", "t", _ENV)
+if not chunk then error(err) end
+chunk()
