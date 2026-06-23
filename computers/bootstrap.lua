@@ -59,7 +59,7 @@ print("------------------------")
 print("Computer ID: " .. os.getComputerID())
 print("")
 
-local role = ask_choice("Role", { "master", "worker" })
+local role = ask_choice("Role", { "controlplane", "worker" })
 
 local label = ask(
   "Label",
@@ -76,10 +76,17 @@ local cfg = {
   metrics_path     = "/mineplane/metrics",
 }
 
-if role == "master" then
+if role == "controlplane" then
   cfg.timeout_seconds  = tonumber(ask("Node timeout (s)", 45))  or 45
   cfg.eviction_seconds = tonumber(ask("Node eviction (s)", 300)) or 300
 else
+  local node_name
+  repeat
+    node_name = ask("Node (area name, e.g. factory)")
+    if not node_name or node_name == "" then print("  node is required") end
+  until node_name and node_name ~= ""
+
+  cfg.node   = node_name
   cfg.labels = { type = "worker" }
 end
 
@@ -90,6 +97,7 @@ local function write_config(c)
   f.writeLine("return {")
   f.writeLine('  role             = "' .. c.role .. '",')
   f.writeLine('  label            = "' .. c.label .. '",')
+  if c.node then f.writeLine('  node             = "' .. c.node .. '",') end
   f.writeLine('  heartbeat_interval = ' .. c.heartbeat_interval .. ',')
   f.writeLine('  scrape_interval  = ' .. c.scrape_interval .. ',')
   f.writeLine('  flush_interval   = ' .. c.flush_interval .. ',')

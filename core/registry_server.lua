@@ -38,7 +38,12 @@ function RegistryServer:step()
   local sender, msg = self._transport.receive(self._tick_interval)
   if msg then
     if msg.type == "REGISTER" then
-      self._registry:register({ id = msg.id, label = msg.label, labels = msg.labels }, now)
+      self._registry:register({
+        id     = msg.id,
+        label  = msg.label,
+        node   = msg.node,
+        labels = msg.labels,
+      }, now)
       self._transport.send(sender, { type = "ACK", master_id = self._master_id })
     elseif msg.type == "HEARTBEAT" then
       self._registry:heartbeat(msg.id, now)

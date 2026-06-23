@@ -1,10 +1,15 @@
 local NodeAgent = require("core.node_agent")
 local fakes     = require("test.support.fakes")
 
+local DEFAULT_OPTS = { node = "factory" }
+
 local function make_agent(epoch_ms, transport_override, opts)
   local ctx       = fakes.make_ctx(epoch_ms)
   local transport = transport_override or fakes.make_transport()
-  local agent     = NodeAgent.new(ctx, 7, transport, opts)
+  local merged    = {}
+  for k, v in pairs(DEFAULT_OPTS) do merged[k] = v end
+  if opts then for k, v in pairs(opts) do merged[k] = v end end
+  local agent = NodeAgent.new(ctx, 7, transport, merged)
   return agent, transport
 end
 
@@ -29,7 +34,7 @@ describe("NodeAgent", function()
       fakes.make_ctx(1000000),
       7,
       transport,
-      { label = "farm-east", labels = { type = "turtle" } }
+      { node = "factory", label = "farm-east", labels = { type = "turtle" } }
     )
     agent:step()
     local msg = transport._broadcasts[1]
@@ -37,10 +42,35 @@ describe("NodeAgent", function()
     assert.equals(msg.labels.type, "turtle")
   end)
 
+  it("REGISTER includes node from opts", function()
+    local transport = fakes.make_transport()
+    local agent = NodeAgent.new(
+      fakes.make_ctx(1000000),
+      7,
+      transport,
+      { node = "mine" }
+    )
+    agent:step()
+    local msg = transport._broadcasts[1]
+    assert.equals(msg.node, "mine")
+  end)
+
+  it("constructor rejects missing node", function()
+    assert.error_matches(function()
+      NodeAgent.new(fakes.make_ctx(1000000), 7, fakes.make_transport(), {})
+    end, "opts.node")
+  end)
+
+  it("constructor rejects empty node string", function()
+    assert.error_matches(function()
+      NodeAgent.new(fakes.make_ctx(1000000), 7, fakes.make_transport(), { node = "" })
+    end, "opts.node")
+  end)
+
   it("ACK on first step sets registered() true", function()
     local transport = fakes.make_transport()
     transport.inject(1, { type = "ACK", master_id = 1 })
-    local agent = NodeAgent.new(fakes.make_ctx(1000000), 7, transport)
+    local agent = NodeAgent.new(fakes.make_ctx(1000000), 7, transport, DEFAULT_OPTS)
     agent:step()
     assert.truthy(agent:registered())
   end)
@@ -48,7 +78,7 @@ describe("NodeAgent", function()
   it("after ACK, next step sends HEARTBEAT to master_id", function()
     local transport = fakes.make_transport()
     transport.inject(1, { type = "ACK", master_id = 1 })
-    local agent = NodeAgent.new(fakes.make_ctx(1000000), 7, transport)
+    local agent = NodeAgent.new(fakes.make_ctx(1000000), 7, transport, DEFAULT_OPTS)
     agent:step()
     -- inject another ACK for the heartbeat receive call
     transport.inject(1, { type = "ACK", master_id = 1 })
@@ -69,7 +99,7 @@ describe("NodeAgent", function()
     -- initial ACK to register
     transport.inject(1, { type = "ACK", master_id = 1 })
     local agent = NodeAgent.new(
-      fakes.make_ctx(1000000), 7, transport, { miss_limit = 3 }
+      fakes.make_ctx(1000000), 7, transport, { node = "factory", miss_limit = 3 }
     )
     agent:step()
     assert.truthy(agent:registered())
@@ -84,7 +114,7 @@ describe("NodeAgent", function()
     local transport = fakes.make_transport()
     transport.inject(1, { type = "ACK", master_id = 1 })
     local agent = NodeAgent.new(
-      fakes.make_ctx(1000000), 7, transport, { miss_limit = 3 }
+      fakes.make_ctx(1000000), 7, transport, { node = "factory", miss_limit = 3 }
     )
     agent:step()
     -- two missed heartbeats
@@ -113,7 +143,7 @@ describe("NodeAgent", function()
         sleep = function(n) table.insert(slept, n) end,
       },
     }
-    local agent = NodeAgent.new(ctx, 7, fakes.make_transport(), { interval_seconds = 30 })
+    local agent = NodeAgent.new(ctx, 7, fakes.make_transport(), { node = "factory", interval_seconds = 30 })
     agent:step()
     assert.equals(#slept, 1)
     assert.equals(slept[1], 30)

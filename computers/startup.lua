@@ -86,7 +86,7 @@ local function run_master(config)
     refresh_seconds = config.refresh_seconds or 5,
   })
 
-  print("[mineplane] master started, id=" .. os.getComputerID())
+  print("[mineplane] controlplane started, id=" .. os.getComputerID())
 
   -- Add new long-running subsystems here as the stack grows.
   parallel.waitForAll(
@@ -104,11 +104,17 @@ local function run_worker(config)
   local ScrapeController = require("core.scrape_controller")
   local FlushController  = require("core.flush_controller")
 
+  assert(
+    type(config.node) == "string" and config.node ~= "",
+    "config.node is required for workers — set it in config.lua"
+  )
+
   local transport = make_transport()
   local ctx       = make_ctx()
-  local label     = config.label or os.getComputerLabel() or ("node-" .. os.getComputerID())
+  local label     = config.label or os.getComputerLabel() or ("computer-" .. os.getComputerID())
   local agent     = NodeAgent.new(ctx, os.getComputerID(), transport, {
     label            = label,
+    node             = config.node,
     labels           = config.labels,
     interval_seconds = config.heartbeat_interval,
   })
@@ -133,7 +139,7 @@ local function run_worker(config)
     flusher:register(tsdb)
   end
 
-  print("[mineplane] worker started, label=" .. label)
+  print("[mineplane] worker started: " .. config.node .. "/" .. label)
 
   -- Add new long-running subsystems here as the stack grows.
   parallel.waitForAll(
@@ -149,12 +155,12 @@ local ok, err = pcall(function()
   local config = load_config()
   open_modem()
 
-  if config.role == "master" then
+  if config.role == "controlplane" then
     run_master(config)
   elseif config.role == "worker" then
     run_worker(config)
   else
-    error("config.role must be 'master' or 'worker', got: " .. tostring(config.role))
+    error("config.role must be 'controlplane' or 'worker', got: " .. tostring(config.role))
   end
 end)
 

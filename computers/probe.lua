@@ -11,9 +11,15 @@
 local PROTOCOL = "mineplane"
 local LISTEN_SECONDS = 3
 
-local function pass(msg) print("  [OK] " .. msg) end
-local function fail(msg) printError("  [FAIL] " .. msg) end
-local function info(msg) print("  [--] " .. msg) end
+local function pass(msg)
+  print("  [OK] " .. msg)
+end
+local function fail(msg)
+  printError("  [FAIL] " .. msg)
+end
+local function info(msg)
+  print("  [--] " .. msg)
+end
 local function section(title)
   print("")
   print("-- " .. title .. " " .. string.rep("-", 40 - #title))
@@ -22,7 +28,7 @@ end
 -- ── 1. identity ───────────────────────────────────────────────────────────────
 
 section("identity")
-local my_id    = os.getComputerID()
+local my_id = os.getComputerID()
 local my_label = os.getComputerLabel() or "(none)"
 info("computer id    = " .. my_id)
 info("computer label = " .. my_label)
@@ -82,14 +88,20 @@ end
 section("transport table (shape check)")
 
 local transport = {
-  send      = function(id, m) rednet.send(id, m, PROTOCOL) end,
-  broadcast = function(m)     rednet.broadcast(m, PROTOCOL) end,
-  receive   = function(t)     return rednet.receive(PROTOCOL, t) end,
+  send = function(id, m)
+    rednet.send(id, m, PROTOCOL)
+  end,
+  broadcast = function(m)
+    rednet.broadcast(m, PROTOCOL)
+  end,
+  receive = function(t)
+    return rednet.receive(PROTOCOL, t)
+  end,
 }
 
-local shape_ok = type(transport.send)      == "function"
-              and type(transport.broadcast) == "function"
-              and type(transport.receive)   == "function"
+local shape_ok = type(transport.send) == "function"
+  and type(transport.broadcast) == "function"
+  and type(transport.receive) == "function"
 if shape_ok then
   pass("transport table has correct shape")
 else

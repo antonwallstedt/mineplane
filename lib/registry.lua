@@ -25,8 +25,10 @@ function Registry.new(config)
   return self
 end
 
---- Upsert a node. Always sets last_seen = now and status = "Ready".
---- @param node_info table  { id, label?, labels? }
+--- Upsert a computer. Always sets last_seen = now and status = "Ready".
+--- node is preserved from the existing record on re-registration if not
+--- provided, matching the same upsert pattern as label and registered_at.
+--- @param node_info table  { id, label?, node?, labels? }
 --- @param now       number  epoch seconds
 function Registry:register(node_info, now)
   assert(type(node_info.id) == "number", "node_info.id must be a number")
@@ -35,6 +37,7 @@ function Registry:register(node_info, now)
   self._nodes[node_info.id] = {
     id            = node_info.id,
     label         = node_info.label  or existing.label  or "",
+    node          = node_info.node   or existing.node   or "",
     labels        = node_info.labels or existing.labels or {},
     last_seen     = now,
     registered_at = existing.registered_at or now,
@@ -93,6 +96,34 @@ end
 --- @return table|nil
 function Registry:get(id)
   return self._nodes[id]
+end
+
+--- Sorted list of unique node strings across all computer records.
+--- @return string[]
+function Registry:node_names()
+  local seen, result = {}, {}
+  for _, computer in pairs(self._nodes) do
+    if computer.node ~= "" and not seen[computer.node] then
+      seen[computer.node] = true
+      table.insert(result, computer.node)
+    end
+  end
+  table.sort(result)
+  return result
+end
+
+--- Computers belonging to a specific node, sorted ascending by id.
+--- @param node_name string
+--- @return table[]
+function Registry:computers_in_node(node_name)
+  local result = {}
+  for _, computer in pairs(self._nodes) do
+    if computer.node == node_name then
+      table.insert(result, computer)
+    end
+  end
+  table.sort(result, function(a, b) return a.id < b.id end)
+  return result
 end
 
 return Registry
