@@ -113,6 +113,7 @@ function Rpc:call(target_id, method, payload, opts)
         elseif msg.type == Rpc.TYPE.ERROR then
           return false, msg.payload
         end
+        break  -- unexpected type on a matched ID — break out, don't retry
       end
     end
     self:_txn_resolve(id)
@@ -137,6 +138,9 @@ function Rpc.serve_step(transport, handlers, opts)
   assert(type(handlers) == "table", "handlers must be a table")
   opts = opts or {}
 
+  -- No timeout: production transport blocks until a message arrives (correct for a
+  -- server coroutine). Callers needing a polling budget must pass a transport whose
+  -- receive(timeout_s) returns nil on expiry.
   local sender_id, msg = transport.receive()
   if msg == nil or type(msg) ~= "table" or msg.type ~= Rpc.TYPE.REQUEST then
     return false
@@ -187,6 +191,8 @@ end
 --- @param side  string  modem side, e.g. "top", "left", "back"
 --- @return table  transport
 function Rpc.rednet_transport(side)
+  -- rednet.open is idempotent in CC: opening an already-open modem side is safe,
+  -- so constructing multiple transports on the same side will not error.
   rednet.open(side)
   return {
     send    = function(target_id, msg) rednet.send(target_id, msg) end,

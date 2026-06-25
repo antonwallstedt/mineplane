@@ -338,4 +338,28 @@ describe("Rpc:call", function()
     assert.equals(transport._sends[1].msg.id, 1)
     assert.equals(transport._sends[2].msg.id, 2)
   end)
+
+  it("matched-ID with unexpected type breaks out and returns timeout", function()
+    -- A message whose id matches but whose type is neither RESPONSE nor ERROR should
+    -- not cause call() to loop forever. With the fix it breaks out of the inner loop
+    -- and the attempt is treated as timed-out, so call() returns false, "timeout".
+    local clock_val = 0
+    local receive_count = 0
+    local transport = {
+      send    = function() end,
+      -- First receive: returns the unexpected-type message (id=1 matches attempt 1).
+      -- Subsequent receives: return nil so remaining attempts drain immediately.
+      receive = function(_)
+        receive_count = receive_count + 1
+        if receive_count == 1 then
+          return 1, { id = 1, type = Rpc.TYPE.REQUEST, payload = nil }
+        end
+        return 1, nil
+      end,
+    }
+    local rpc = Rpc.new(transport, { clock = function() return clock_val end })
+    local ok, err = rpc:call(1, "ping", {}, { timeout = 3, attempts = 3 })
+    assert.equals(ok,  false)
+    assert.equals(err, "timeout")
+  end)
 end)
