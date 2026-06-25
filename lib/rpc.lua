@@ -51,4 +51,62 @@ function Rpc.new(transport, opts)
   return self
 end
 
+-- ─── serve_step / serve ───────────────────────────────────────────────────────
+
+--- Process one pending message. Returns true if a request was dispatched.
+--- Consistent with ScrapeController.step() — testable single iteration.
+--- @param transport  table
+--- @param handlers   table  { [method]: fun(payload, sender_id)->any }
+--- @param opts       table|nil  { on_error: fun(method, err) }
+--- @return boolean
+function Rpc.serve_step(transport, handlers, opts)
+  assert(type(transport) == "table", "transport must be a table")
+  assert(type(transport.send) == "function", "transport.send must be a function")
+  assert(type(transport.receive) == "function", "transport.receive must be a function")
+  assert(type(handlers) == "table", "handlers must be a table")
+  opts = opts or {}
+
+  local sender_id, msg = transport.receive()
+  if msg == nil or type(msg) ~= "table" or msg.type ~= Rpc.TYPE.REQUEST then
+    return false
+  end
+
+  local handler = handlers[msg.method]
+  if not handler then
+    transport.send(sender_id, {
+      id      = msg.id,
+      type    = Rpc.TYPE.ERROR,
+      payload = "unknown method: " .. tostring(msg.method),
+    })
+    return true
+  end
+
+  local ok, result = pcall(handler, msg.payload, sender_id)
+  if ok then
+    transport.send(sender_id, {
+      id      = msg.id,
+      type    = Rpc.TYPE.RESPONSE,
+      payload = result,
+    })
+  else
+    transport.send(sender_id, {
+      id      = msg.id,
+      type    = Rpc.TYPE.ERROR,
+      payload = result,
+    })
+    if opts.on_error then opts.on_error(msg.method, result) end
+  end
+  return true
+end
+
+--- Blocking serve loop — run as a coroutine via parallel.waitForAll.
+--- @param transport  table
+--- @param handlers   table
+--- @param opts       table|nil
+function Rpc.serve(transport, handlers, opts)
+  while true do
+    Rpc.serve_step(transport, handlers, opts)
+  end
+end
+
 return Rpc
