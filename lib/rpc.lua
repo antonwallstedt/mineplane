@@ -51,6 +51,77 @@ function Rpc.new(transport, opts)
   return self
 end
 
+-- ─── transaction controller (internal) ───────────────────────────────────────
+
+function Rpc:_txn_create(timeout_s)
+  local id = self._next_id
+  self._next_id = self._next_id + 1
+  self._txns[id] = { expiry = self._clock() + timeout_s }
+  return id
+end
+
+function Rpc:_txn_resolve(id)
+  local txn = self._txns[id]
+  if not txn then return nil end
+  self._txns[id] = nil
+  return txn
+end
+
+function Rpc:_txn_cleanup()
+  local now = self._clock()
+  for id, txn in pairs(self._txns) do
+    if now >= txn.expiry then self._txns[id] = nil end
+  end
+end
+
+-- ─── call ─────────────────────────────────────────────────────────────────────
+
+local CALL_DEFAULTS = { timeout = 5, attempts = 3 }
+
+--- @param target_id  integer
+--- @param method     string
+--- @param payload    any
+--- @param opts       table|nil  { timeout: number, attempts: integer }
+--- @return boolean, any  ok, result_or_error
+function Rpc:call(target_id, method, payload, opts)
+  assert(type(target_id) == "number", "target_id must be a number")
+  assert(type(method) == "string" and method ~= "", "method must be a non-empty string")
+  opts = opts or {}
+  local timeout     = opts.timeout  or CALL_DEFAULTS.timeout
+  local attempts    = opts.attempts or CALL_DEFAULTS.attempts
+  local per_attempt = timeout / attempts
+
+  for _ = 1, attempts do
+    local id = self:_txn_create(per_attempt)
+    self._transport.send(target_id, {
+      id      = id,
+      type    = Rpc.TYPE.REQUEST,
+      method  = method,
+      payload = payload,
+    })
+
+    local deadline = self._clock() + per_attempt
+    while true do
+      local remaining = deadline - self._clock()
+      if remaining <= 0 then break end
+      local _sender, msg = self._transport.receive(remaining)
+      if msg == nil then break end
+      if msg.id == id then
+        self:_txn_resolve(id)
+        if msg.type == Rpc.TYPE.RESPONSE then
+          return true, msg.payload
+        elseif msg.type == Rpc.TYPE.ERROR then
+          return false, msg.payload
+        end
+      end
+    end
+    self:_txn_resolve(id)
+  end
+
+  self:_txn_cleanup()
+  return false, "timeout"
+end
+
 -- ─── serve_step / serve ───────────────────────────────────────────────────────
 
 --- Process one pending message. Returns true if a request was dispatched.

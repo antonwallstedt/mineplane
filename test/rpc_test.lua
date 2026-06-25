@@ -219,3 +219,123 @@ describe("Rpc.serve_step", function()
     assert.equals(r2.type, Rpc.TYPE.RESPONSE)
   end)
 end)
+
+-- ─── nil transport helper ─────────────────────────────────────────────────────
+
+local function make_counting_transport(queued_responses)
+  local sends = {}
+  local responses = queued_responses or {}
+  return {
+    send    = function(target, msg) table.insert(sends, { target = target, msg = msg }) end,
+    -- Must return sender_id, msg — call() unpacks two values: local _sender, msg = receive()
+    receive = function(_) return 1, table.remove(responses, 1) end,
+    _sends  = sends,
+  }
+end
+
+-- ─── Rpc:call ─────────────────────────────────────────────────────────────────
+
+describe("Rpc:call", function()
+  it("rejects non-number target_id", function()
+    local rpc = Rpc.new({ send = function() end, receive = function() end })
+    assert.error_matches(
+      function() rpc:call("bad", "ping", {}) end,
+      "target_id must be a number"
+    )
+  end)
+
+  it("rejects empty method", function()
+    local rpc = Rpc.new({ send = function() end, receive = function() end })
+    assert.error_matches(
+      function() rpc:call(1, "", {}) end,
+      "method must be a non%-empty string"
+    )
+  end)
+
+  it("returns true and payload on success", function()
+    local caller, _ = fakes.make_loopback_pair()
+    local rpc = Rpc.new(caller)
+    -- pre-load the response (id=1, first call)
+    caller._inbox[1] = { id = 1, type = Rpc.TYPE.RESPONSE, payload = "pong" }
+    local ok, result = rpc:call(1, "ping", {}, { timeout = 5, attempts = 1 })
+    assert.equals(ok,     true)
+    assert.equals(result, "pong")
+  end)
+
+  it("sends a well-formed request envelope", function()
+    local transport = make_counting_transport(
+      { { id = 1, type = Rpc.TYPE.RESPONSE, payload = "ok" } }
+    )
+    local rpc = Rpc.new(transport)
+    rpc:call(42, "do_thing", { key = "value" }, { timeout = 5, attempts = 1 })
+    local sent = transport._sends[1]
+    assert.equals(sent.target,     42)
+    assert.equals(sent.msg.type,   Rpc.TYPE.REQUEST)
+    assert.equals(sent.msg.method, "do_thing")
+    assert.same(sent.msg.payload,  { key = "value" })
+    assert.truthy(sent.msg.id)
+  end)
+
+  it("returns false and error string on TYPE.ERROR — no retry", function()
+    local transport = make_counting_transport(
+      { { id = 1, type = Rpc.TYPE.ERROR, payload = "handler crashed" } }
+    )
+    local rpc = Rpc.new(transport)
+    local ok, err = rpc:call(1, "ping", {}, { timeout = 5, attempts = 3 })
+    assert.equals(ok,  false)
+    assert.equals(err, "handler crashed")
+    assert.equals(#transport._sends, 1)  -- sent only once, no retry
+  end)
+
+  it("retries on transport timeout and exhausts attempts", function()
+    local transport = make_counting_transport({})  -- always returns nil
+    local rpc = Rpc.new(transport)
+    local ok, err = rpc:call(1, "ping", {}, { timeout = 5, attempts = 3 })
+    assert.equals(ok,  false)
+    assert.equals(err, "timeout")
+    assert.equals(#transport._sends, 3)  -- one send per attempt
+  end)
+
+  it("succeeds on retry after initial timeout", function()
+    -- nil in a Lua table literal is unreliable; use a receive counter instead
+    local send_count   = 0
+    local receive_count = 0
+    local transport = {
+      send    = function() send_count = send_count + 1 end,
+      -- attempt 1: receive returns nil (timeout); attempt 2: returns response with id=2
+      receive = function(_)
+        receive_count = receive_count + 1
+        if receive_count == 1 then return 1, nil end
+        return 1, { id = 2, type = Rpc.TYPE.RESPONSE, payload = "ok" }
+      end,
+    }
+    local rpc = Rpc.new(transport)
+    local ok, result = rpc:call(1, "ping", {}, { timeout = 5, attempts = 3 })
+    assert.equals(ok,        true)
+    assert.equals(result,    "ok")
+    assert.equals(send_count, 2)  -- one send per attempt; second attempt succeeds
+  end)
+
+  it("discards mismatched correlation IDs and keeps polling", function()
+    local caller, _ = fakes.make_loopback_pair()
+    local rpc = Rpc.new(caller)
+    -- pre-load: wrong id first, then correct
+    table.insert(caller._inbox, { id = 99, type = Rpc.TYPE.RESPONSE, payload = "wrong" })
+    table.insert(caller._inbox, { id = 1,  type = Rpc.TYPE.RESPONSE, payload = "right" })
+    local ok, result = rpc:call(1, "ping", {}, { timeout = 5, attempts = 1 })
+    assert.equals(ok,     true)
+    assert.equals(result, "right")
+  end)
+
+  it("correlation IDs increment across calls", function()
+    local transport = make_counting_transport({
+      { id = 1, type = Rpc.TYPE.RESPONSE, payload = "a" },
+      { id = 2, type = Rpc.TYPE.RESPONSE, payload = "b" },
+    })
+    local rpc = Rpc.new(transport)
+    rpc:call(1, "first",  {}, { timeout = 5, attempts = 1 })
+    rpc:call(1, "second", {}, { timeout = 5, attempts = 1 })
+    assert.equals(transport._sends[1].msg.id, 1)
+    assert.equals(transport._sends[2].msg.id, 2)
+  end)
+end)
