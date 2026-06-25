@@ -100,7 +100,7 @@ function Rpc:call(target_id, method, payload, opts)
       payload = payload,
     })
 
-    local deadline = self._clock() + per_attempt
+    local deadline = self._txns[id].expiry
     while true do
       local remaining = deadline - self._clock()
       if remaining <= 0 then break end
