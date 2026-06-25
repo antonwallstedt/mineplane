@@ -180,4 +180,18 @@ function Rpc.serve(transport, handlers, opts)
   end
 end
 
+-- ─── rednet transport (production) ───────────────────────────────────────────
+
+--- Thin CC rednet wrapper. Call once at node startup.
+--- Not unit-testable (CC globals); verified by CraftOS-PC integration tests.
+--- @param side  string  modem side, e.g. "top", "left", "back"
+--- @return table  transport
+function Rpc.rednet_transport(side)
+  rednet.open(side)
+  return {
+    send    = function(target_id, msg) rednet.send(target_id, msg) end,
+    receive = function(timeout_s) return rednet.receive(nil, timeout_s) end,
+  }
+end
+
 return Rpc
