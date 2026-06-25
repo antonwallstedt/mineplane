@@ -86,4 +86,19 @@ function M.average(...)
   return sum / #values
 end
 
+function M.make_loopback_pair()
+  local inbox_a, inbox_b = {}, {}
+  local function make(my_inbox, their_inbox, partner_id)
+    return {
+      send    = function(_, msg) table.insert(their_inbox, msg) end,
+      receive = function(_)
+        local msg = table.remove(my_inbox, 1)
+        if msg then return partner_id, msg end
+      end,
+      _inbox  = my_inbox,
+    }
+  end
+  return make(inbox_a, inbox_b, 2), make(inbox_b, inbox_a, 1)
+end
+
 return M
